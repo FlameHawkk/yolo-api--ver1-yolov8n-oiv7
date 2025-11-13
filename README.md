@@ -9,21 +9,28 @@
   "model_name": "yolov8n.pt",
   "translate_name": "coco.csv"
 }
+
 или
+
 {
   "model_name": "yolov8n-oiv7.pt",
   "translate_name": "OpenImagesV7.csv"
 }
+
 или
+
 {
   "model_name": "yolo10n.pt",
   "translate_name": "coco.csv"
 }
+
 или
+
 {
   "model_name": "yolo11n.pt",
   "translate_name": "coco.csv"
 }
+
 или для другой по аналогии.
 
 На Render в "Start Command" нужно указать:
