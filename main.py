@@ -332,28 +332,21 @@ async def health_check():
     }
 
 @app.api_route("/model", methods=["GET", "HEAD"])
-async def list_models():
+async def list_model():
     """
     Endpoint для получения информации о текущей загруженной модели
     """
     return {
-        "current_model": model_config.get("model_name", "none"),
-        "translate_file": model_config.get("translate_name", "none"),
-        "available_translations": list(translation_dict.keys())[:10] + ["..."] if len(translation_dict) > 10 else list(translation_dict.keys())
+        "current_model": model_config.get("model_name", "none")        
     }
 
 @app.api_route("/config", methods=["GET", "HEAD"])
 async def get_config():
-    """
-    Endpoint для получения текущей конфигурации сервера
-    Полезен для отладки и проверки настроек
-    """
+    """Endpoint для получения текущей конфигурации сервера"""
     return {
         "model_config": model_config,
-        "translation_stats": {
-            "total_classes": len(translation_dict),
-            "translate_file": model_config.get("translate_name", "none")
-        }
+        "translate_file": model_config.get("translate_name", "none"),
+        "translations_loaded": len(translation_dict)
     }
 
 @app.api_route("/", methods=["GET", "HEAD"])
@@ -363,7 +356,7 @@ async def root():
     """
     return {
         "message": "YOLO Object Detection API",
-        "version": "1.2.0",
+        "version": "1",
         "endpoints": {
             "/predict/": "POST - выполнить детекцию объектов на изображении",
             "/health": "GET - проверить состояние сервера", 
