@@ -180,8 +180,8 @@ async def startup_event():
 @app.post("/predict/")
 async def predict(
     file: UploadFile = File(...),
-    confidence: float = Form(0.5),  # ИЗМЕНЕНО: Form вместо query параметра
-    language: str = Form("en")      # ИЗМЕНЕНО: Form и переименовано lang->language
+    confidence: float = Form(0.5),
+    language: str = Form("en")
 ):
     """
     Основной endpoint для выполнения предсказания на изображении
@@ -189,7 +189,7 @@ async def predict(
     Args:
         file: Загружаемое изображение (обязательный параметр)
         confidence: Порог уверенности для детекции (по умолчанию 0.5)
-        lang: Язык возвращаемых меток ('en' или 'ru', по умолчанию 'en')
+        language: Язык возвращаемых меток ('en' или 'ru', по умолчанию 'en')
     
     Returns:
         dict: Результаты детекции с переведенными метками
@@ -222,19 +222,17 @@ async def predict(
         image_data = await file.read()
         file_size = len(image_data)
         print(f"📁 Получено изображение: {file.filename}, размер: {file_size} байт")
-        
+
         # Открываем изображение с помощью PIL
         image = Image.open(io.BytesIO(image_data))
+
+        # Конвертируем в RGB если нужно (для PNG с альфа-каналом)
+        if image.mode in ('RGBA', 'LA', 'P'):
+            image = image.convert('RGB')
+            print("🔄 Конвертирован в RGB")
+        
         image_array = np.array(image)
         print(f"🖼️ Размер изображения: {image_array.shape}")
-        
-        # Конвертируем цветовое пространство при необходимости
-        if len(image_array.shape) == 3 and image_array.shape[2] == 4:
-            image_array = cv2.cvtColor(image_array, cv2.COLOR_RGBA2RGB)
-            print("🔄 Конвертирован RGBA -> RGB")
-        elif len(image_array.shape) == 3:
-            image_array = cv2.cvtColor(image_array, cv2.COLOR_BGR2RGB)
-            print("🔄 Конвертирован BGR -> RGB")
         
         # Выполняем предсказание с помощью YOLO модели
         print(f"🔍 Выполнение предсказания YOLO с уверенностью {confidence}...")        
@@ -277,13 +275,21 @@ async def predict(
         detections.sort(key=lambda x: x['confidence'], reverse=True)
         
         # Создаем аннотированное изображение с bounding boxes
-        annotated_image = results[0].plot()
+        annotated_image = results[0].plot()  # YOLO plot возвращает BGR изображение
+        
+        # Конвертируем из BGR (OpenCV) в RGB (стандарт)
+        annotated_image_rgb = cv2.cvtColor(annotated_image, cv2.COLOR_BGR2RGB)
+        
         print("🖌️ Создано аннотированное изображение")
         
         # Конвертируем изображение в base64 для передачи в ответе
-        _, buffer = cv2.imencode('.jpg', annotated_image)
+        # примечание: Используем PIL для сохранения чтобы избежать проблем с цветами
+        pil_image = Image.fromarray(annotated_image_rgb)
+        buffered = io.BytesIO()
+        pil_image.save(buffered, format="JPEG", quality=95)
+        
         import base64
-        image_base64 = base64.b64encode(buffer).decode('utf-8')
+        image_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
         
         print(f"🎉 Успешно завершено. Возвращаем {len(detections)} детекций")
         
@@ -325,7 +331,7 @@ async def health_check():
         "timestamp": datetime.now().isoformat()
     }
 
-@app.api_route("/models", methods=["GET", "HEAD"])
+@app.api_route("/model", methods=["GET", "HEAD"])
 async def list_models():
     """
     Endpoint для получения информации о текущей загруженной модели
@@ -361,24 +367,7 @@ async def root():
         "endpoints": {
             "/predict/": "POST - выполнить детекцию объектов на изображении",
             "/health": "GET - проверить состояние сервера", 
-            "/models": "GET - информация о текущей модели",
+            "/model": "GET - информация о текущей модели",
             "/config": "GET - текущая конфигурация"
         }
-    }
-
-# Добавим endpoint для отладки переводов
-@app.get("/debug/translation/{label}")
-async def debug_translation(label: str):
-    """
-    Endpoint для отладки переводов
-    """
-    results = {}
-    for lang in ['en', 'ru']:
-        results[lang] = get_label_translation(label, lang)
-    
-    return {
-        "input_label": label,
-        "translations": results,
-        "in_dictionary": label in translation_dict,
-        "dictionary_keys_sample": list(translation_dict.keys())[:10]
     }
